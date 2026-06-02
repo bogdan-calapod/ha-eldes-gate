@@ -38,6 +38,32 @@
       }
     }
   },
+  "entity": {
+    "button": {
+      "open_single": {
+        "name": "Open"
+      },
+      "open_output": {
+        "name": "Open {output}"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status"
+      },
+      "updated_at": {
+        "name": "Last updated"
+      },
+      "model_id": {
+        "name": "Model ID"
+      }
+    }
+  },
   "services": {
     "open": {
       "name": "Open gate",

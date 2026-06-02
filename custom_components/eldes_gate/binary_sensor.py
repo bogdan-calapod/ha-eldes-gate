@@ -46,6 +46,7 @@ class EldesAliveBinarySensor(
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_has_entity_name = True
     _attr_name = "Online"
+    _attr_translation_key = "online"
 
     def __init__(
         self,

@@ -41,8 +41,17 @@ async def async_setup_entry(
 
     entities: list[EldesOpenButton] = []
     for device in coordinator.data.devices:
-        for output in device.get("outputs") or []:
-            entities.append(EldesOpenButton(coordinator, entry, device, output))
+        outputs = device.get("outputs") or []
+        # When a controller has a single output, the button name "Open" reads
+        # cleanest in the UI ("<Gate name> Open"). With multiple outputs we
+        # need the output label to disambiguate ("<Gate> Open Vehicle").
+        single_output = len(outputs) == 1
+        for output in outputs:
+            entities.append(
+                EldesOpenButton(
+                    coordinator, entry, device, output, single_output
+                )
+            )
     async_add_entities(entities)
     _LOGGER.info("Created %d Eldes open buttons", len(entities))
 
@@ -80,15 +89,24 @@ class EldesOpenButton(CoordinatorEntity[EldesCoordinator], ButtonEntity):
         entry: ConfigEntry,
         device: dict[str, Any],
         output: dict[str, Any],
+        single_output: bool,
     ) -> None:
         super().__init__(coordinator)
         self._entry = entry
         self._device_id = str(device["id"])
         self._output_number = int(output["number"])
-        self._attr_name = f"Open {_output_label(output)}"
+        self._attr_name = "Open" if single_output else f"Open {_output_label(output)}"
         self._attr_unique_id = (
             f"{entry.entry_id}_{self._device_id}_open_{self._output_number}"
         )
+        # Translation key + extra attributes make the entity easier to
+        # localise and to spot in the entity registry.
+        self._attr_translation_key = (
+            "open_single" if single_output else "open_output"
+        )
+        self._attr_translation_placeholders = {
+            "output": _output_label(output),
+        }
 
     @property
     def _device(self) -> dict[str, Any]:

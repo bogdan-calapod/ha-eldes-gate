@@ -74,6 +74,120 @@ data:
   timeout: 20          # optional override of the entry option
 ```
 
+## Dashboards
+
+Once the integration is added, every gate appears as an HA **device** with
+its own buttons, sensors and connectivity binary sensor. You can drop any
+of them on a dashboard with the regular UI editor (**Edit dashboard →
+Add card → pick an entity**). A few patterns that work well:
+
+### Tile card per gate (recommended)
+
+```yaml
+type: tile
+entity: button.bariera_c8_open       # single-output device
+name: Bariera C8
+icon: mdi:boom-gate
+tap_action:
+  action: perform-action
+  perform_action: button.press
+  target:
+    entity_id: button.bariera_c8_open
+```
+
+For a multi-output device (one button per output):
+
+```yaml
+type: vertical-stack
+cards:
+  - type: tile
+    entity: binary_sensor.poarta_pietonala_c8_online
+    name: Poarta Pietonala C8
+    icon: mdi:gate
+  - type: horizontal-stack
+    cards:
+      - type: tile
+        entity: button.poarta_pietonala_c8_open_poarta_c8
+        name: Pedestrian
+        icon: mdi:walk
+        tap_action: { action: perform-action, perform_action: button.press,
+                      target: { entity_id: button.poarta_pietonala_c8_open_poarta_c8 } }
+```
+
+### Classic button card
+
+```yaml
+type: button
+entity: button.bariera_c8_open
+name: Open Barrier
+icon: mdi:boom-gate-up
+show_state: false
+tap_action:
+  action: perform-action
+  perform_action: button.press
+  target:
+    entity_id: button.bariera_c8_open
+```
+
+### Entities card grouping a device
+
+```yaml
+type: entities
+title: Bariera C8
+entities:
+  - entity: binary_sensor.bariera_c8_online
+  - entity: sensor.bariera_c8_status
+  - entity: sensor.bariera_c8_last_updated
+  - type: button
+    name: Open
+    icon: mdi:boom-gate-up
+    action_name: OPEN
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.bariera_c8_open
+```
+
+### Calling the service directly (scripts / automations / shortcuts)
+
+```yaml
+script:
+  open_bariera_c8:
+    alias: Open Bariera C8
+    sequence:
+      - service: eldes_gate.open
+        data:
+          device: "Bariera C8"
+          output: 1
+          wait: true
+          timeout: 20
+```
+
+This is also what you'd point the iOS / Android Home Assistant
+companion-app widgets at if you want a one-tap open shortcut on your
+phone home screen.
+
+### Entity naming convention
+
+With `has_entity_name=True`, HA prefixes the device name automatically.
+So a controller named "Bariera C8" with a single output gives you:
+
+| Entity ID | Friendly name |
+|---|---|
+| `button.bariera_c8_open` | Bariera C8 Open |
+| `binary_sensor.bariera_c8_online` | Bariera C8 Online |
+| `sensor.bariera_c8_status` | Bariera C8 Status |
+| `sensor.bariera_c8_last_updated` | Bariera C8 Last updated |
+| `sensor.bariera_c8_model_id` | Bariera C8 Model ID |
+
+Controllers with multiple outputs get one `button.*_open_<output>` per
+output, e.g. `button.<gate>_open_pedestrian`, `button.<gate>_open_vehicle`.
+
+Status / Last updated / Model ID are tagged as **diagnostic** entities,
+so they sit under the "Diagnostic" section of the device page (still
+addable to dashboards if you want them there).
+
 ## How it works under the hood
 
 Endpoints exercised (all on `https://ea-gates-api.e-alarms.com`):

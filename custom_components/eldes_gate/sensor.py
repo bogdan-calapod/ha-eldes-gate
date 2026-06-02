@@ -26,12 +26,14 @@ _LOGGER = logging.getLogger(__name__)
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="status",
+        translation_key="status",
         name="Status",
         icon="mdi:information-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensorEntityDescription(
         key="updated_at",
+        translation_key="updated_at",
         name="Last Updated",
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:clock-outline",
@@ -39,6 +41,7 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     ),
     SensorEntityDescription(
         key="model_id",
+        translation_key="model_id",
         name="Model ID",
         icon="mdi:tag-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
