@@ -1,0 +1,79 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Eldes Gate",
+        "description": "Sign in with the credentials you use in the official Eldes Gates mobile app.",
+        "data": {
+          "phone": "Phone (username)",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter Eldes password",
+        "description": "Your saved password is no longer accepted by the server.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The phone or password is wrong.",
+      "cannot_connect": "Could not reach the Eldes API. Check your network and try again.",
+      "unknown": "Unexpected error. See the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "This Eldes account is already configured.",
+      "reauth_successful": "Re-authentication successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Eldes Gate options",
+        "data": {
+          "update_interval": "Polling interval (seconds)",
+          "open_timeout": "Open command confirmation timeout (seconds)"
+        }
+      }
+    }
+  },
+  "services": {
+    "open": {
+      "name": "Open gate",
+      "description": "Send an open command and wait for controller confirmation.",
+      "fields": {
+        "device": {
+          "name": "Device",
+          "description": "Device id or name."
+        },
+        "output": {
+          "name": "Output",
+          "description": "Output number, control name, or zone name."
+        },
+        "wait": {
+          "name": "Wait for confirmation",
+          "description": "Poll until the controller confirms."
+        },
+        "timeout": {
+          "name": "Timeout (s)",
+          "description": "Max seconds to wait for confirmation."
+        }
+      }
+    },
+    "refresh": {
+      "name": "Refresh devices",
+      "description": "Force a refresh of the device list."
+    },
+    "forgot_password": {
+      "name": "Forgot password",
+      "description": "Trigger a password reset email.",
+      "fields": {
+        "email": {
+          "name": "Email",
+          "description": "Account email address."
+        }
+      }
+    }
+  }
+}

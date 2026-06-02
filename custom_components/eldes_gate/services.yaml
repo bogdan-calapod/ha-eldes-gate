@@ -1,0 +1,62 @@
+open:
+  name: Open
+  description: >
+    Send an "open" command to an Eldes gate output. Polls the controller
+    for confirmation unless `wait: false`.
+  fields:
+    device:
+      name: Device
+      description: >
+        Device id or device name as shown by the integration (case-
+        insensitive).
+      required: true
+      example: "Main"
+      selector:
+        text:
+    output:
+      name: Output
+      description: >
+        Output number (1..N), control name, or zone name.
+      required: true
+      example: 1
+      selector:
+        text:
+    wait:
+      name: Wait for confirmation
+      description: >
+        If true (default), poll the API until the controller confirms
+        the command was received.
+      required: false
+      default: true
+      selector:
+        boolean:
+    timeout:
+      name: Confirmation timeout (s)
+      description: >
+        Maximum seconds to wait for confirmation. Defaults to the entry
+        option (20 s).
+      required: false
+      example: 20
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: s
+          mode: box
+
+refresh:
+  name: Refresh
+  description: Force a refresh of the device list from the cloud API.
+
+forgot_password:
+  name: Forgot password
+  description: >
+    Trigger a password-reset email by calling POST /auth/forgot-password.
+    Unauthenticated; uses the integration's HTTP session.
+  fields:
+    email:
+      name: Email address
+      required: true
+      example: "user@example.com"
+      selector:
+        text:

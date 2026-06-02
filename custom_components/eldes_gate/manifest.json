@@ -1,0 +1,14 @@
+{
+  "domain": "eldes_gate",
+  "name": "Eldes Gate",
+  "codeowners": ["@bogdan-calapod"],
+  "config_flow": true,
+  "documentation": "https://github.com/bogdan-calapod/ha-eldes-gate",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/bogdan-calapod/ha-eldes-gate/issues",
+  "requirements": [
+    "requests>=2.31.0"
+  ],
+  "homeassistant": "2024.1.0",
+  "version": "0.1.0"
+}
