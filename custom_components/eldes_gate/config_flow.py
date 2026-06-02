@@ -14,6 +14,7 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .api import EldesAPI, EldesAPIError, EldesAuthError
 from .const import (
+    ATTR_EMAIL,
     CONF_OPEN_TIMEOUT,
     CONF_PASSWORD,
     CONF_PHONE,
@@ -50,14 +51,51 @@ async def _validate_credentials(
     return None
 
 
+async def _send_forgot_password(hass: HomeAssistant, email: str) -> str | None:
+    """POST /auth/forgot-password.
+
+    Returns None on success or an error key on failure. The endpoint is
+    unauthenticated, so we instantiate EldesAPI with empty creds — only
+    the HTTP session is used.
+    """
+    api = EldesAPI("", "", "")
+    try:
+        await hass.async_add_executor_job(api.forgot_password, email)
+    except EldesAPIError as err:
+        # Server distinguishes "email not found or not verified" (404)
+        # from generic errors. Surface both, but tell them apart so the
+        # UI can render a helpful hint.
+        msg = str(err).lower()
+        if "not found" in msg or "not verified" in msg or "404" in msg:
+            return "email_not_found"
+        _LOGGER.warning("forgot_password failed: %s", err)
+        return "cannot_connect"
+    except Exception:  # pragma: no cover
+        _LOGGER.exception("Unexpected error sending forgot-password")
+        return "unknown"
+    finally:
+        await hass.async_add_executor_job(api.close)
+    return None
+
+
 class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Initial setup flow: phone + password."""
+    """Initial setup flow."""
 
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        """Entry point: pick between signing in and requesting a reset email."""
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["sign_in", "forgot_password"],
+        )
+
+    async def async_step_sign_in(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """The actual credentials form."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -104,7 +142,7 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(
-            step_id="user",
+            step_id="sign_in",
             data_schema=schema,
             errors=errors,
             description_placeholders={
@@ -116,6 +154,31 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_forgot_password(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Trigger POST /auth/forgot-password from the setup screen."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            email = (user_input.get(ATTR_EMAIL) or "").strip()
+            if "@" not in email:
+                errors["base"] = "invalid_email"
+            else:
+                error = await _send_forgot_password(self.hass, email)
+                if error:
+                    errors["base"] = error
+                else:
+                    return self.async_abort(
+                        reason="forgot_password_sent",
+                        description_placeholders={"email": email},
+                    )
+
+        return self.async_show_form(
+            step_id="forgot_password",
+            data_schema=vol.Schema({vol.Required(ATTR_EMAIL): str}),
+            errors=errors,
+        )
+
     async def async_step_reauth(
         self, entry_data: dict[str, Any]
     ) -> FlowResult:
@@ -123,6 +186,21 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """During reauth, offer either to re-enter the password or send a
+        reset email."""
+        # If the user typed something it's the password form; otherwise
+        # show a menu first.
+        if user_input is None:
+            return self.async_show_menu(
+                step_id="reauth_confirm",
+                menu_options=["reauth_password", "forgot_password"],
+            )
+        # Fall through is unused (each menu choice routes to its own step).
+        return await self.async_step_reauth_password(user_input)
+
+    async def async_step_reauth_password(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         errors: dict[str, str] = {}
@@ -152,7 +230,7 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason="reauth_successful")
 
         return self.async_show_form(
-            step_id="reauth_confirm",
+            step_id="reauth_password",
             data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             errors=errors,
         )

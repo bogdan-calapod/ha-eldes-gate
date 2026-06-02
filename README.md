@@ -16,11 +16,20 @@ GSM gate / garage-door controllers, talking to the same cloud backend
   the controller's `is_alive` flag (cloud-side liveness, not gate
   position — see notes).
 - **Diagnostic sensors** – status code, last-updated timestamp, model id.
+- **Account-level buttons** – per config entry, on a synthetic "Eldes
+  Account" device:
+  - `button.eldes_account_<phone>_send_password_reset_email` – fires
+    `POST /auth/forgot-password` against the account's own email.
+  - `button.eldes_account_<phone>_refresh_devices` – forces a refresh.
 - **Services**:
   - `eldes_gate.open` – send an open command from automations / scripts.
   - `eldes_gate.refresh` – force a re-poll of the device list.
   - `eldes_gate.forgot_password` – trigger a password-reset email
     (unauthenticated `POST /auth/forgot-password`).
+- **Forgot-password from setup / re-auth** – the config flow's entry
+  screen offers "Forgot password? Send a reset email" as a menu option,
+  so you don't need to be logged in or know the service name to trigger
+  a reset. Same option appears in the re-auth flow.
 - **Re-auth flow** – if the server rejects the cached credentials, HA
   prompts you for a new password instead of silently failing.
 - **Options flow** – tune the polling interval (default 5 min) and the

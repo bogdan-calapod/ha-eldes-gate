@@ -3,14 +3,37 @@
     "step": {
       "user": {
         "title": "Eldes Gate",
-        "description": "Sign in with the credentials you use in the official Eldes Gates mobile app.\n\nThe Eldes API only accepts one device UUID per account at a time. Leaving \"Device UUID\" blank mints a fresh one — adding HA will sign the phone app out the next time it logs in. To keep the phone working alongside HA, paste the phone's UUID into this field (see the integration README for how to extract `vendorid` from the app's SharedPreferences).",
+        "description": "Sign in to the Eldes Gates cloud, or trigger a password-reset email if you've forgotten your password.",
+        "menu_options": {
+          "sign_in": "Sign in",
+          "forgot_password": "Forgot password? Send a reset email"
+        }
+      },
+      "sign_in": {
+        "title": "Sign in to Eldes Gate",
+        "description": "Use the same credentials you use in the official Eldes Gates mobile app.\n\nThe Eldes API only accepts one device UUID per account at a time. Leaving \"Device UUID\" blank mints a fresh one — adding HA will sign the phone app out the next time it logs in. To keep the phone working alongside HA, paste the phone's UUID into this field (see the integration README for how to extract `vendorid` from the app's SharedPreferences).",
         "data": {
           "phone": "Phone (username)",
           "password": "Password",
           "uuid": "Device UUID (optional)"
         }
       },
+      "forgot_password": {
+        "title": "Send password reset email",
+        "description": "Enter the email address registered on your Eldes account. The cloud will email you a reset link.",
+        "data": {
+          "email": "Email address"
+        }
+      },
       "reauth_confirm": {
+        "title": "Eldes re-authentication",
+        "description": "Your saved password is no longer accepted by the server.",
+        "menu_options": {
+          "reauth_password": "Re-enter password",
+          "forgot_password": "Send a reset email instead"
+        }
+      },
+      "reauth_password": {
         "title": "Re-enter Eldes password",
         "description": "Your saved password is no longer accepted by the server.",
         "data": {
@@ -21,11 +44,14 @@
     "error": {
       "invalid_auth": "The phone or password is wrong.",
       "cannot_connect": "Could not reach the Eldes API. Check your network and try again.",
+      "invalid_email": "That doesn't look like an email address.",
+      "email_not_found": "The Eldes server doesn't recognise that email (or it's not verified on your account).",
       "unknown": "Unexpected error. See the Home Assistant log for details."
     },
     "abort": {
       "already_configured": "This Eldes account is already configured.",
-      "reauth_successful": "Re-authentication successful."
+      "reauth_successful": "Re-authentication successful.",
+      "forgot_password_sent": "A password-reset email has been sent to {email}. Open the link in that email to set a new password, then re-add or re-authenticate the integration."
     }
   },
   "options": {
@@ -46,6 +72,12 @@
       },
       "open_output": {
         "name": "Open {output}"
+      },
+      "forgot_password": {
+        "name": "Send password reset email"
+      },
+      "refresh": {
+        "name": "Refresh devices"
       }
     },
     "binary_sensor": {
