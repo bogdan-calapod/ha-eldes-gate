@@ -212,6 +212,60 @@ fronted by Cloudflare, which blocks generic Python clients with
 "error code: 1010" (browser fingerprint). The official app uses OkHttp,
 so we match it.
 
+## Single-device UUID lock (important)
+
+The Eldes cloud API enforces **one device UUID per account at a time**:
+
+```
+empty UUID      → 400 "username, password and uuid are required"
+new UUID        → 401 "this account registered on a different device"
+the bound UUID  → 200 OK
+```
+
+The official mobile app sidesteps this by generating one UUID on first
+install (stored as `vendorid` in its `SharedPreferences`) and reusing
+it forever. As soon as a second client logs in with a different UUID,
+the server rebinds and the previous client gets the 401 on its next
+attempt.
+
+For HA this means **two realistic setups**:
+
+1. **HA-only.** Leave the "Device UUID" field in the config flow empty.
+   The integration mints a fresh UUID and binds the account to itself.
+   The phone app will sign out the next time it tries to talk to the
+   server. (You can still re-log in on the phone later, but that will
+   then kick HA out — tug-of-war.)
+2. **HA + phone sharing the same UUID.** Paste the phone's `vendorid`
+   into the "Device UUID" field. Both clients then look identical to
+   the server's UUID check, so neither kicks the other on login. They
+   each still get their own bearer token.
+
+### Extracting the phone's UUID
+
+On a **rooted Android** device:
+
+```sh
+adb shell su -c \
+  'cat /data/data/lt.eldes.smartgate.appswidget/shared_prefs/lt.eldes.smargate.appswidget.xml' \
+  | grep vendorid
+```
+
+> Note the SharedPreferences filename has a typo — `smargate`, not
+> `smartgate`. It's a quirk in the app itself.
+
+You'll get a line like:
+
+```xml
+<string name="vendorid">a1b2c3d4-e5f6-7890-abcd-ef1234567890</string>
+```
+
+Paste that UUID into the integration's setup form.
+
+On a **non-rooted** device the cleanest path is `adb backup` of the
+package, unpacking the tar inside, and grepping the same file. Some
+Android versions disable backup for this app — in that case there's no
+non-root way to extract it and you're stuck with option 1.
+
 ## Caveats
 
 - **No real gate position**. The API tells you the command was

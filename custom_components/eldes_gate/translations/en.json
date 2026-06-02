@@ -3,10 +3,11 @@
     "step": {
       "user": {
         "title": "Eldes Gate",
-        "description": "Sign in with the credentials you use in the official Eldes Gates mobile app.",
+        "description": "Sign in with the credentials you use in the official Eldes Gates mobile app.\n\nThe Eldes API only accepts one device UUID per account at a time. Leaving \"Device UUID\" blank mints a fresh one — adding HA will sign the phone app out the next time it logs in. To keep the phone working alongside HA, paste the phone's UUID into this field (see the integration README for how to extract `vendorid` from the app's SharedPreferences).",
         "data": {
           "phone": "Phone (username)",
-          "password": "Password"
+          "password": "Password",
+          "uuid": "Device UUID (optional)"
         }
       },
       "reauth_confirm": {

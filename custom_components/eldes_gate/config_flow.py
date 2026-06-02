@@ -63,10 +63,16 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             phone = user_input[CONF_PHONE].strip()
             password = user_input[CONF_PASSWORD]
-            # Generate a stable install UUID on first setup (matches the
-            # `uuid` field the official app sends; some servers tie sessions
-            # to it). Reuse across re-auths.
-            uuid_value = str(uuid_mod.uuid4())
+            # The Eldes API enforces a single-bound-UUID policy per account:
+            # every fresh login from a different UUID gets back 401
+            # "this account registered on a different device".
+            #
+            # By default we mint a new UUID. The user can paste the phone
+            # app's UUID instead to coexist with the mobile app (both look
+            # like the same device to the server). See README for how to
+            # extract `vendorid` from the app's SharedPreferences.
+            raw_uuid = (user_input.get(CONF_UUID) or "").strip()
+            uuid_value = raw_uuid or str(uuid_mod.uuid4())
 
             await self.async_set_unique_id(phone.lower())
             self._abort_if_unique_id_configured()
@@ -94,10 +100,20 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_PHONE): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Optional(CONF_UUID, default=""): str,
             }
         )
         return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "uuid_hint": (
+                    "Leave blank to mint a new device UUID (will kick the "
+                    "Eldes mobile app off this account the next time it "
+                    "re-logs in). Paste the phone's UUID to share the slot."
+                ),
+            },
         )
 
     async def async_step_reauth(
