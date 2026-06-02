@@ -162,14 +162,21 @@ class EldesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> EldesOptionsFlow:
-        return EldesOptionsFlow(config_entry)
+        # The base class auto-injects `config_entry` on the returned
+        # OptionsFlow instance; passing it here would set the read-only
+        # property and 500 the UI on HA 2024.12+.
+        return EldesOptionsFlow()
 
 
 class EldesOptionsFlow(config_entries.OptionsFlow):
-    """Edit update interval and open-command timeout."""
+    """Edit update interval and open-command timeout.
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    Note: do NOT define __init__ here. Recent HA versions (2024.12+)
+    expose `config_entry` as a read-only property on OptionsFlow that
+    the framework auto-injects; assigning to it raises
+    `AttributeError: property 'config_entry' of '...' object has no setter`
+    and the UI surfaces it as a 500 when the user opens the gear icon.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
