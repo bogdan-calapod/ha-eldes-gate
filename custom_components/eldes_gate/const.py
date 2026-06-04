@@ -46,7 +46,7 @@ DEFAULT_UPDATE_INTERVAL = 300  # 5 minutes
 MIN_UPDATE_INTERVAL = 60
 MAX_UPDATE_INTERVAL = 3600
 
-DEFAULT_OPEN_TIMEOUT = 20  # seconds to wait for /command/{seq} confirmation
+DEFAULT_OPEN_TIMEOUT = 30  # seconds to wait for /command/{seq} confirmation
 MIN_OPEN_TIMEOUT = 5
 MAX_OPEN_TIMEOUT = 120
 

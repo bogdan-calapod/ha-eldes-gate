@@ -21,6 +21,7 @@ Sync `requests`-based; run via `hass.async_add_executor_job(...)`.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -67,12 +68,25 @@ class EldesAPI:
         self._password = password
         self._uuid = uuid
         self._session = requests.Session()
+        # The Android app sends X-App-Version-Code on *every* request, not
+        # just /auth/*. Without it the /devices/{id}/command/{seq} polling
+        # endpoint has been observed to return HTTP 200 with an empty `{}`
+        # body, which made `await_confirmation` spin until its deadline
+        # even though the underlying command had succeeded. Putting it on
+        # the session default also covers /auth/* (no per-call override
+        # needed).
         self._session.headers.update(
             {
                 "User-Agent": HTTP_USER_AGENT,
                 "Accept": "application/json",
+                "X-App-Version-Code": APP_VERSION_CODE,
             }
         )
+        # `requests.Session` is not thread-safe, but Home Assistant fans
+        # out concurrent button presses into multiple executor jobs that
+        # all share `self._session`. Serialise the actual wire calls so
+        # concurrent presses don't corrupt each other's responses.
+        self._lock = threading.RLock()
         self._access_token: str | None = None
         self._expires_at: str | None = None
         self._email: str | None = None
@@ -112,12 +126,8 @@ class EldesAPI:
         url = API_BASE_URL + ENDPOINT_LOGIN
         _LOGGER.debug("Eldes login phone=%s", self._phone)
         try:
-            resp = self._session.post(
-                url,
-                json=body,
-                headers={"X-App-Version-Code": APP_VERSION_CODE},
-                timeout=HTTP_TIMEOUT,
-            )
+            with self._lock:
+                resp = self._session.post(url, json=body, timeout=HTTP_TIMEOUT)
         except requests.RequestException as exc:
             raise EldesAPIError(f"Network error during login: {exc}") from exc
 
@@ -149,11 +159,12 @@ class EldesAPI:
         if not self._access_token:
             return
         try:
-            self._session.post(
-                API_BASE_URL + ENDPOINT_LOGOUT,
-                headers={"Authorization": f"Bearer {self._access_token}"},
-                timeout=HTTP_TIMEOUT,
-            )
+            with self._lock:
+                self._session.post(
+                    API_BASE_URL + ENDPOINT_LOGOUT,
+                    headers={"Authorization": f"Bearer {self._access_token}"},
+                    timeout=HTTP_TIMEOUT,
+                )
         except requests.RequestException as exc:
             _LOGGER.debug("Logout ignored network error: %s", exc)
         finally:
@@ -209,23 +220,70 @@ class EldesAPI:
 
         Mirrors CommandConfirmationPoller in the app: exponential backoff
         from 1s up to ~4s, deadline = `timeout` seconds.
+
+        Defences against the empty-`{}` failure mode observed in the
+        wild:
+
+        - treat `None` (204/empty body) and `{}` uniformly as "not yet";
+        - log every poll at DEBUG so future failures are diagnosable;
+        - if three consecutive polls come back empty, drop the bearer
+          token and force a fresh login once. Long-lived sessions have
+          been observed to silently return `{}` instead of a 401 when
+          the upstream considers the token stale, which would otherwise
+          make us spin until the deadline;
+        - on final timeout, surface the last few raw responses in the
+          exception so the HA log has enough to triage with.
         """
         deadline = time.monotonic() + timeout
         interval = 1.0
-        last: dict[str, Any] = {}
+        last: Any = None
+        history: list[str] = []
+        empty_streak = 0
+        relogin_attempted = False
         while time.monotonic() < deadline:
             time.sleep(interval)
             interval = min(interval * 1.5, 4.0)
             try:
                 last = self.get_command_status(device_id, seq)
             except EldesAPIError as exc:
-                _LOGGER.debug("Status poll error (will retry): %s", exc)
+                _LOGGER.debug(
+                    "Status poll error device=%s SEQ=%s (will retry): %s",
+                    device_id,
+                    seq,
+                    exc,
+                )
+                history.append(f"err={exc}")
                 continue
-            if last.get("confirmed"):
+            _LOGGER.debug(
+                "Status poll device=%s SEQ=%s -> %r", device_id, seq, last
+            )
+            history.append(repr(last)[:200])
+            if last and last.get("confirmed"):
                 return last
+            if not last:  # None, {} or other falsy
+                empty_streak += 1
+                if empty_streak >= 3 and not relogin_attempted:
+                    _LOGGER.info(
+                        "3 consecutive empty status polls on SEQ=%s "
+                        "device=%s; dropping bearer token and re-logging in",
+                        seq,
+                        device_id,
+                    )
+                    relogin_attempted = True
+                    empty_streak = 0
+                    self._access_token = None
+                    try:
+                        self.login()
+                    except EldesAuthError as exc:
+                        _LOGGER.debug(
+                            "Re-login during status poll failed: %s", exc
+                        )
+            else:
+                empty_streak = 0
+        tail = " | ".join(history[-3:]) if history else "no responses"
         raise EldesCommandTimeout(
             f"Command SEQ={seq} on device {device_id} not confirmed within "
-            f"{timeout}s (last response: {last})"
+            f"{timeout}s (last responses: {tail})"
         )
 
     # ------------------------------------------------------------------
@@ -241,12 +299,10 @@ class EldesAPI:
         """
         url = API_BASE_URL + ENDPOINT_FORGOT_PASSWORD
         try:
-            resp = self._session.post(
-                url,
-                json={"email": email},
-                headers={"X-App-Version-Code": APP_VERSION_CODE},
-                timeout=HTTP_TIMEOUT,
-            )
+            with self._lock:
+                resp = self._session.post(
+                    url, json={"email": email}, timeout=HTTP_TIMEOUT
+                )
         except requests.RequestException as exc:
             raise EldesAPIError(f"Network error: {exc}") from exc
         if resp.status_code >= 400:
@@ -288,9 +344,14 @@ class EldesAPI:
         for attempt in (1, 2):
             headers = {"Authorization": f"Bearer {self._access_token}"}
             try:
-                resp = self._session.request(
-                    method, url, json=json, headers=headers, timeout=HTTP_TIMEOUT
-                )
+                with self._lock:
+                    resp = self._session.request(
+                        method,
+                        url,
+                        json=json,
+                        headers=headers,
+                        timeout=HTTP_TIMEOUT,
+                    )
             except requests.RequestException as exc:
                 raise EldesAPIError(
                     f"Network error on {method} {path}: {exc}"

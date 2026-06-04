@@ -17,6 +17,7 @@ device pages.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from functools import partial
 from typing import Any
@@ -127,6 +128,12 @@ class EldesOpenButton(CoordinatorEntity[EldesCoordinator], ButtonEntity):
         self._attr_translation_placeholders = {
             "output": _output_label(output),
         }
+        # Serialise rapid taps on the same button. Without this, a user
+        # spamming the press fans out into N concurrent send_open +
+        # await_confirmation jobs sharing one requests.Session, which
+        # was the trigger for the empty-`{}` polling failures we saw on
+        # Bariera C3.
+        self._press_lock = asyncio.Lock()
 
     @property
     def _device(self) -> dict[str, Any]:
@@ -162,6 +169,10 @@ class EldesOpenButton(CoordinatorEntity[EldesCoordinator], ButtonEntity):
         }
 
     async def async_press(self) -> None:
+        async with self._press_lock:
+            await self._do_press()
+
+    async def _do_press(self) -> None:
         device = self._device
         if not device:
             raise HomeAssistantError(
